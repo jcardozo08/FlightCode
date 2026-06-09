@@ -1,12 +1,17 @@
 //---------------------------------------------------------INICIALIZACOES---------------------------------------------------------
 #include "src/lib/config.h"
+#include "src/lib/pinout.h"
+
+unsigned long currentTime = 0;  //Inicializando variavel de tempo
+float altitude = 0;             //Inicializando altitude
+int contador_linha = 1;         //Inicializando contador de linha
 
 #if ((GYRO) || (MAG) || (ACCEL) || (BMP180) || (USE_BMP280))
 #include <Wire.h>
 #endif
 
 #if (REINICIO)
-#if defined(ARDUINO_ARCH_ESP32)
+#if defined(PLACA_ESSENTIALS_V1) || defined(PLACA_MAIN_PTH) || defined(PLACA_MAIN_SMD) || defined(PLACA_MAIN_IC)
 #include <Preferences.h>
 Preferences prefs;
 bool vooAtivo;
@@ -54,7 +59,20 @@ BMP085 bmp;
 
 #if (FILTROS)
 
-#define NUM_FILTROS 3 //Definindo variavel para os filtros
+#define NUM_FILTROS 3  //Definindo variavel para os filtros
+
+#if (CALIBRATION_IMU)
+#define BIAS_ACCEL_X 0.0008
+#define BIAS_ACCEL_Y 0.0038
+#define BIAS_ACCEL_Z -0.0023
+#define SCALE_ACCEL_X 1.012696
+#define SCALE_ACCEL_Y 0.999127
+#define SCALE_ACCEL_Z 0.996743
+
+#define BIAS_GYRO_X 4.572174
+#define BIAS_GYRO_Y -1.737915
+#define BIAS_GYRO_Z 0.417297
+#endif
 
 #if (KALMAN)
 #include <SimpleKalmanFilter.h>
@@ -68,6 +86,35 @@ FiltroMediaMovel f1(NUM_LEITURAS);
 FiltroMediaMovel f2(NUM_LEITURAS);
 FiltroMediaMovel f3(NUM_LEITURAS);
 
+#endif
+#endif
+
+#if (KALMAN_IMU)
+#include <SimpleKalmanFilter.h>
+// Parâmetros: processNoise, measurementNoise, estimatedError
+SimpleKalmanFilter kal_ax(2, 2, 0.01);
+SimpleKalmanFilter kal_ay(2, 2, 0.01);
+SimpleKalmanFilter kal_az(2, 2, 0.01);
+
+SimpleKalmanFilter kal_gx(2, 2, 0.01);
+SimpleKalmanFilter kal_gy(2, 2, 0.01);
+SimpleKalmanFilter kal_gz(2, 2, 0.01);
+
+float ax_kal = 0;
+float ay_kal = 0;
+float az_kal = 0;
+
+float gx_kal = 0;
+float gy_kal = 0;
+float gz_kal = 0;
+
+
+#if (ENABLE_3D)
+#include <MahonyAHRS.h>
+Mahony filter;
+#define FREQ_3D 100.0f  // Frequência de atualização (Hz)
+float yaw_offset = 0.0f;
+bool yaw_zeroed = false;
 #endif
 #endif
 
@@ -89,29 +136,29 @@ Simulador sim(BAUD_RATE, LED_PIN);
 
 
 //Inicializando paraquedas
-#if (P1)
-Paraquedas p1(TEMPO_LIGADO_PQD, TEMPO_DELAY_PQD1, IGN_1, HEAL_1, ALTURA_ATIVACAO_PQD1);
+#if (PQD_DN)
+Paraquedas pqd_dn(TEMPO_LIGADO_PQD, TEMPO_DELAY_PQD1, IGN_1, HEAL_1, ALTURA_ATIVACAO_PQD1);
 #endif
-#if (P2)
-Paraquedas p2(TEMPO_LIGADO_PQD, TEMPO_DELAY_PQD2, IGN_2, HEAL_2, ALTURA_ATIVACAO_PQD2);
+#if (PQD_DB)
+Paraquedas pqd_db(TEMPO_LIGADO_PQD, TEMPO_DELAY_PQD2, IGN_2, HEAL_2, ALTURA_ATIVACAO_PQD2);
 #endif
-#if (P3)
-Paraquedas p3(TEMPO_LIGADO_PQD, TEMPO_DELAY_PQD3, IGN_3, HEAL_3, ALTURA_ATIVACAO_PQD3);
+#if (PQD_MN)
+Paraquedas pqd_mn(TEMPO_LIGADO_PQD, TEMPO_DELAY_PQD3, IGN_3, HEAL_3, ALTURA_ATIVACAO_PQD3);
 #endif
-#if (P4)
-Paraquedas p4(TEMPO_LIGADO_PQD, TEMPO_DELAY_PQD4, IGN_4, HEAL_4, ALTURA_ATIVACAO_PQD4);
+#if (PQD_MB)
+Paraquedas pqd_mb(TEMPO_LIGADO_PQD, TEMPO_DELAY_PQD4, IGN_4, HEAL_4, ALTURA_ATIVACAO_PQD4);
 #endif
 
 #endif
 
 #if (USE_DHT)
 #include "DHT.h"
-DHT dht(DHTPIN, DHTTYPE);
+DHT dht(DHT_PIN, DHTTYPE);
 #endif  // USE_DHT
 
 #if (LORA)
 
-#if defined(ARDUINO_AVR_MEGA2560)
+#if (PLACA_MAIN_OCTA_PTH)
 HardwareSerial& LoRa = Serial3;
 
 #elif defined(ARDUINO_ARCH_ESP32)
@@ -121,6 +168,20 @@ HardwareSerial LoRa(1);
 #include <SoftwareSerial.h>
 SoftwareSerial LoRa(2, 3);
 #endif
+// #define FREQUENCY_900
+// #include "src/lib/LoraHelper/LoraHelper.h"
+// #if (PLACA_MAIN_OCTA_PTH)
+// Lora_Helper LoRa(Serial3, M0_LORA_PIN, M1_LORA_PIN, AUX_LORA_PIN, FREQ);
+
+
+// #elif defined(ARDUINO_ARCH_ESP32)
+// Lora_Helper LoRa(LoRa(1), LORA_TX, LORA_RX, M0_LORA_PIN, M1_LORA_PIN, AUX_LORA_PIN, FREQ);
+
+
+// #else
+// #include <SoftwareSerial.h>
+// SoftwareSerial LoRa(2, 3);
+// #endif
 
 unsigned long previousMillisLORA = 0;
 const long intervalLORA = INTERVAL_LORA;
@@ -143,14 +204,15 @@ File dataFile;
 #if (GPS_ON)
 #include <TinyGPSPlus.h>
 TinyGPSPlus gps;
-#if defined(ARDUINO_AVR_MEGA2560)
+#if (PLACA_MAIN_OCTA_PTH)
 HardwareSerial& GPS = Serial1;
 
 #elif defined(ARDUINO_ARCH_ESP32)
 HardwareSerial GPS(2);
 
 #else
-#include <SoftwareSerial.h>
+HardwareSerial GPS(2);
+// #include <SoftwareSerial.h>
 // SoftwareSerial GPS(4, 5);
 #endif
 #endif  // GPS
@@ -162,17 +224,14 @@ bool wuf = true;
 #if (TRANSONICO)
 unsigned long transStart = currentTime;
 bool transonico = true;
-#endif 
+#endif
 
 #if (BUZZER)
 #include "src/lib/Buzzer/buzzer.h"
 Buzzer BeepSistemas(BUZZ_PIN, LED_PIN, BUZZ_DELAY, BUZZ_ON, BUZZ_TONE);  // pino, pinoLed, intervaloBeeps, buzzerLigaEm HIGH/LOW, toneMode
 #endif
 
-//Inicializando variavel de tempo
-unsigned long currentTime = 0;
-//Inicializando altitude, temperatura e pressao
-float altitude = 0;
+
 
 
 
@@ -276,29 +335,29 @@ void readAll() {
 
 #if (PARAQUEDAS)
 #if (SAUDE)
-#if (P1)
-  booleano = p1.getInfo();
+#if (PQD_DN)
+  booleano = pqd_dn.getInfo();
 #if (BUZZER)
   BeepSistemas.addSystem(booleano);
 #endif
 #endif
 
-#if (P2)
-  booleano = p2.getInfo();
+#if (PQD_DB)
+  booleano = pqd_db.getInfo();
 #if (BUZZER)
   BeepSistemas.addSystem(booleano);
 #endif
 #endif
 
-#if (P3)
-  booleano = p3.getInfo();
+#if (PQD_MN)
+  booleano = pqd_mn.getInfo();
 #if (BUZZER)
   BeepSistemas.addSystem(booleano);
 #endif
 #endif
 
-#if (P4)
-  booleano = p4.getInfo();
+#if (PQD_MB)
+  booleano = pqd_mb.getInfo();
 #if (BUZZER)
   BeepSistemas.addSystem(booleano);
 #endif
@@ -312,6 +371,16 @@ void readAll() {
     aY = accel.getY();
     aZ = accel.getZ();
     //aSqrt = accel.getSqrt();
+#if (CALIBRATION_IMU)
+    aX = (aX - BIAS_ACCEL_X) * SCALE_ACCEL_X;
+    aY = (aY - BIAS_ACCEL_Y) * SCALE_ACCEL_Y;  // Note o sinal negativo no bias
+    aZ = (aZ - BIAS_ACCEL_Z) * SCALE_ACCEL_Z;
+#endif
+#if (KALMAN_IMU)
+    ax_kal = kal_ax.updateEstimate(aX);
+    ay_kal = kal_ay.updateEstimate(aY);
+    az_kal = kal_az.updateEstimate(aZ);
+#endif
 #if BUZZER
     BeepSistemas.addSystem(true);
 #endif
@@ -328,6 +397,18 @@ void readAll() {
     gX = gyro.getX();
     gY = gyro.getY();
     gZ = gyro.getZ();
+#if (CALIBRATION_IMU)
+    gX = (gX - BIAS_GYRO_X);
+    gY = (gY - BIAS_GYRO_Y);  // Note o sinal negativo no bias
+    gZ = (gZ - BIAS_GYRO_Z);
+#endif
+#if (KALMAN_IMU)
+    gx_kal = kal_gx.updateEstimate(gX);
+    gy_kal = kal_gy.updateEstimate(gY);
+    gz_kal = kal_gz.updateEstimate(gZ);
+#endif
+
+
 #if BUZZER
     BeepSistemas.addSystem(true);
 #endif  // BUZZER
@@ -354,6 +435,26 @@ void readAll() {
     BeepSistemas.addSystem(false);
   }
 #endif  // BUZZER
+#endif
+
+#if (ENABLE_3D)
+  az_kal = -az_kal;
+  gz_kal = -gz_kal;
+
+  // --- Atualiza filtro Mahony ---
+  filter.updateIMU(gx_kal, gy_kal, gz_kal, ax_kal, ay_kal, az_kal);
+
+  // --- Calcula ângulos de Euler ---
+  float roll = filter.getRoll();
+  float pitch = filter.getPitch();
+  float yaw = filter.getYaw();
+
+  if (!yaw_zeroed) {
+    yaw_offset = yaw;
+    yaw_zeroed = true;
+  }
+  yaw -= yaw_offset;
+
 #endif
 
 
@@ -433,31 +534,60 @@ void readAll() {
     dataString += String(gps.location.lat(), 6) + "\t";  // Latitude
     dataString += String(gps.location.lng(), 6) + "\t";  // Longitude
   } else {
-    dataString += "0\t0\t";  // caso não tenha fixo
+    dataString += "~\t~\t";
   }
 
   if (gps.altitude.isValid()) {
     dataString += String(gps.altitude.meters(), 2) + "\t";  // Altitude em metros
+  } else {
+    dataString += "~\t";
   }
 
   if (gps.speed.isValid()) {
     dataString += String(gps.speed.kmph(), 2) + "\t";  // Velocidade em km/h
+  } else {
+    dataString += "~\t";
   }
 
   if (gps.satellites.isValid()) {
     dataString += String(gps.satellites.value()) + "\t";  // Nº de satélites em uso
+  } else {
+    dataString += "~\t";
+  }
+
+  if (gps.time.isValid()) {
+    int hora = gps.time.hour();
+    int minuto = gps.time.minute();
+
+    // Corrige para UTC-3
+    hora = (hora - 3 + 24) % 24;
+
+    char dataHora[32];
+    sprintf(dataHora, "%02d:%02d", hora, minuto);
+
+    dataString += String(dataHora) + "\t";  // Adiciona à string de dados
+  } else {
+    dataString += "~\t~\t";
+  }
+
+  if (gps.hdop.isValid()) {
+    dataString += String(gps.hdop.hdop(), 1) + "\t";
+  } else {
+    dataString += "~\t";
   }
 
 #endif  // GPS
 
 // --- SD CARD PRINT ---
 #if (SD_CARD)
-  dataFile = SD.open(nomeSD, FILE_WRITE);
+  bool sd_bool = false;
+  dataFile = SD.open(nomeSD, FILE_APPEND);
   if (dataFile) {
+    sd_bool = true;
 #if (LED)
     digitalWrite(LED_PIN, HIGH);
 #endif
-    dataFile.print(dataString);
+    dataFile.println(dataString);
     dataFile.close();
 #if (LED)
     digitalWrite(LED_PIN, LOW);
@@ -467,7 +597,8 @@ void readAll() {
 #endif
   } else {
 #if SERIAL_PRINT
-    // Serial.print(F("Error opening "));
+    Serial.print(F("Error opening "));
+    Serial.print(nomeSD);
 #endif
 #if (BUZZER)
     BeepSistemas.addSystem(false);
@@ -482,31 +613,31 @@ void readAll() {
   dataString += String(apogeu.getMaxAltitude(), 2) + '\t';
 #endif
 
-#if (PARAQUEDAS && P1)
-  dataString += String(p1.getData()) + '\t';
+#if (PARAQUEDAS && PQD_DN)
+  dataString += String(pqd_dn.getData()) + '\t';
 #if (SAUDE)
-  dataString += String(p1.getInfo()) + '\t';
+  dataString += String(pqd_dn.getInfo()) + '\t';
 #endif  // SAUDE
 #endif
 
-#if (PARAQUEDAS && P2)
-  dataString += String(p2.getData()) + '\t';
+#if (PARAQUEDAS && PQD_DB)
+  dataString += String(pqd_db.getData()) + '\t';
 #if (SAUDE)
-  dataString += String(p2.getInfo()) + '\t';
+  dataString += String(pqd_db.getInfo()) + '\t';
 #endif  // SAUDE
 #endif
 
-#if (PARAQUEDAS && P3)
-  dataString += String(p3.getData()) + '\t';
+#if (PARAQUEDAS && PQD_MN)
+  dataString += String(pqd_mn.getData()) + '\t';
 #if (SAUDE)
-  dataString += String(p3.getInfo()) + '\t';
+  dataString += String(pqd_mn.getInfo()) + '\t';
 #endif  // SAUDE
 #endif
 
-#if (PARAQUEDAS && P4)
-  dataString += String(p4.getData()) + '\t';
+#if (PARAQUEDAS && PQD_MB)
+  dataString += String(pqd_mb.getData()) + '\t';
 #if (SAUDE)
-  dataString += String(p4.getInfo()) + '\t';
+  dataString += String(pqd_mb.getInfo()) + '\t';
 #endif  // SAUDE
 #endif
 
@@ -517,64 +648,111 @@ void readAll() {
 
 
 #if (LORA)
-  String dataStringSend = String(currentTime / 1000.0, 2) + '\t';
+
+  if (currentTime - previousMillisLORA >= intervalLORA) {
+
+    String dataStringSend = "L:" + String(contador_linha) + "\t";
+    contador_linha += 1;
+    dataStringSend += "T:" + String(currentTime / 1000.0, 2) + "\t";
+
 #if (GPS_ON)
-  if (gps.location.isValid()) {
-    dataStringSend += String(gps.location.lat(), 6) + "\t";
-    dataStringSend += String(gps.location.lng(), 6) + "\t";
-  } else {
-    dataStringSend += "0\t0\t";
-  }
+    if (gps.location.isValid()) {
+      dataStringSend += "LAT:" + String(gps.location.lat(), 6) + "\t";
+      dataStringSend += "LON:" + String(gps.location.lng(), 6) + "\t";
+    } else {
+      dataStringSend += "LAT:~\tLON:~\t";
+    }
+
+    if (gps.time.isValid()) {
+      int hora = gps.time.hour();
+      int minuto = gps.time.minute();
+
+      // Corrige para UTC-3
+      hora = (hora - 3 + 24) % 24;
+
+      dataStringSend += "HR:" + String(hora) + "\t";
+      dataStringSend += "M:" + String(minuto) + "\t";
+    } else {
+      dataStringSend += "HR:~\tM:~\t";
+    }
+
+    if (gps.hdop.isValid()) {
+      dataStringSend += "PR:" + String(gps.hdop.hdop(), 1) + "\t";
+    } else {
+      dataStringSend += "PR:~\t";
+    }
 #else
-  dataStringSend += "0\t0\t";
+    dataStringSend += "LAT:~\tLON:~\tHR:~\tM:~\tPR:~\t";
 #endif
 
 #if (USE_BMP280)
-  dataStringSend += String(altitude, 2) + "\t";
-#endif  // USE_BMP280
+    dataStringSend += "H:" + String(altitude, 2) + "\t";
+#else
+    dataStringSend += "H:0\t";
+#endif
+
+#if (SD_CARD)
+    dataStringSend += "SD:" + String(sd_bool) + "\t";
+#else
+    dataStringSend += "SD:0\t";
+#endif
 
 #if (APOGEU)
-  dataStringSend += String(apogeu.getMaxAltitude(), 2) + "\t";
-#endif  // APOGEU
+    dataStringSend += "AH:";
+    dataStringSend += String(apogeu.getMaxAltitude(), 2) + "\t";
+    dataStringSend += "AT:";
+    dataStringSend += String(apogeu.getApogeuTime() / 1000.0, 2) + "\t";
+#else
+    dataStringSend += "AH:0\tAT:0\t";
+#endif
 
 #if (PARAQUEDAS)
-#if (P1)
-  dataStringSend += String(p1.getPqdHeight(), 2) + "\t";
-  // dataStringSend += String(p1.getPqdTime() / 1000.0, 2) + "\t";
+#if (PQD_DN)
+    dataStringSend += "DN:";
+    dataStringSend += String(pqd_dn.getPqdHeight(), 2) + "\t";
+    // dataStringSend += String(pqd_dn.getPqdTime() / 1000.0, 2) + "\t";
 #endif
-#if (P2)
-  dataStringSend += String(p2.getPqdHeight(), 2) + "\t";
-  // dataStringSend += String(p2.getPqdTime() / 1000.0, 2) + "\t";
+#if (PQD_DB)
+    dataStringSend += "DB:";
+    dataStringSend += String(pqd_db.getPqdHeight(), 2) + "\t";
+    // dataStringSend += String(pqd_db.getPqdTime() / 1000.0, 2) + "\t";
 #endif
-#if (P3)
-  dataStringSend += String(p3.getPqdHeight(), 2) + "\t";
-  // dataStringSend += String(p3.getPqdTime() / 1000.0, 2) + "\t";
+#if (PQD_MN)
+    dataStringSend += "MN:";
+    dataStringSend += String(pqd_mn.getPqdHeight(), 2) + "\t";
+    // dataStringSend += String(pqd_mn.getPqdTime() / 1000.0, 2) + "\t";
 #endif
-#if (P4)
-  dataStringSend += String(p4.getPqdHeight(), 2) + "\t";
-  // dataStringSend += String(p4.getPqdTime() / 1000.0, 2) + "\t";
+#if (PQD_MB)
+    dataStringSend += "MB:";
+    dataStringSend += String(pqd_mb.getPqdHeight(), 2) + "\t";
+    // dataStringSend += String(pqd_mb.getPqdTime() / 1000.0, 2) + "\t";
 #endif
+
+
 #else
-  dataStringSend += "0\t0\t";
-  dataStringSend += "0\t0\t";
-  dataStringSend += "0\t0\t";
-  dataStringSend += "0\t0\t";
+    dataStringSend += "DN:0\t";
+    dataStringSend += "DB:0\t";
+    dataStringSend += "MN:0\t";
+    dataStringSend += "MB:0\t";
 #endif
 
-#if (QUATERNIONS)
-  dataStringSend += "0\t0\t";
-  dataStringSend += "0\t0\t";
-  dataStringSend += "0\t0\t";
-  dataStringSend += "0\t0\t";
+#if (USE_BMP280)
+    dataStringSend += "TP:" + String(temperatura, 2) + "\t";
 #else
-  dataStringSend += "0\t0\t";
-  dataStringSend += "0\t0\t";
-  dataStringSend += "0\t0\t";
-  dataStringSend += "0\t0\t";
+    dataStringSend += "TP:0\t";
+#endif
+
+#if (ENABLE_3D)
+    dataStringSend += "R:" +String(roll, 2) + "\t";
+    dataStringSend += "P:" +String(pitch, 2) + "\t";
+    dataStringSend += "Y:" +String(yaw, 2) + "\t";
+#else
+    dataStringSend += "R:0\t";
+    dataStringSend += "P:0\t";
+    dataStringSend += "Y:0\t";
 #endif
 
 
-  if (currentTime - previousMillisLORA >= intervalLORA) {
     LoRa.println(dataStringSend);
     previousMillisLORA = currentTime;
   }
@@ -604,86 +782,32 @@ void doAll() {
   apogeu.deteccaoApogeu(alturaReal, 0);  //0 para deteccao de apogeu comum || 1 para deteccao de apogeu personalizada
 
   //Paraquedas 1
-#if (P1)
-  p1.ativarParaquedas(alturaReal, currentTime, apogeu.getEstaDescendo());
-  //p1.ativarParaquedas(alturaReal, currentTime, apogeu.getEstaDescendo(), bmp.getEstaDescendoTimer());
+#if (PQD_DN)
+  pqd_dn.ativarParaquedas(alturaReal, currentTime, apogeu.getEstaDescendo());
+  //pqd_dn.ativarParaquedas(alturaReal, currentTime, apogeu.getEstaDescendo(), bmp.getEstaDescendoTimer());
 #endif
 
   //Paraquedas 2
-#if (P2)
-  p2.ativarParaquedas(alturaReal, currentTime, apogeu.getEstaDescendo());
-  //p2.ativarParaquedas(alturaReal, currentTime, apogeu.getEstaDescendo(), bmp.getEstaDescendoTimer());
+#if (PQD_DB)
+  pqd_db.ativarParaquedas(alturaReal, currentTime, apogeu.getEstaDescendo());
+  //pqd_db.ativarParaquedas(alturaReal, currentTime, apogeu.getEstaDescendo(), bmp.getEstaDescendoTimer());
 #endif
 
 //Paraquedas 3
-#if (P3)
-  p3.ativarParaquedas(alturaReal, currentTime, apogeu.getEstaDescendo());
-  //p3.ativarParaquedas(alturaReal, currentTime, apogeu.getEstaDescendo(), bmp.getEstaDescendoTimer());
+#if (PQD_MN)
+  pqd_mn.ativarParaquedas(alturaReal, currentTime, apogeu.getEstaDescendo());
+  //pqd_mn.ativarParaquedas(alturaReal, currentTime, apogeu.getEstaDescendo(), bmp.getEstaDescendoTimer());
 #endif
 
 //Paraquedas 4
-#if (P4)
-  p4.ativarParaquedas(alturaReal, currentTime, apogeu.getEstaDescendo());
-  //p4.ativarParaquedas(alturaReal, currentTime, apogeu.getEstaDescendo(), bmp.getEstaDescendoTimer());
+#if (PQD_MB)
+  pqd_mb.ativarParaquedas(alturaReal, currentTime, apogeu.getEstaDescendo());
+  //pqd_mb.ativarParaquedas(alturaReal, currentTime, apogeu.getEstaDescendo(), bmp.getEstaDescendoTimer());
 #endif
 
 #endif
 }
 
-#if (LORA)
-void setLoraFreq(float freqMHz, int pinM0 = M0_LORA_PIN, int pinM1 = M1_LORA_PIN) {
-  uint8_t HEAD = 0xC2;
-  uint8_t ADDH = 0x00;
-  uint8_t ADDL = 0x01;
-  uint8_t SPEED = 0x19;
-  uint8_t OPTION_0 = 0x00;
-  uint8_t OPTION_1 = 0x00;
-  uint8_t CHAN = 0;
-
-  // Arredondamento da frequência para canal inteiro
-  uint16_t freqRounded = round(freqMHz);
-
-  // Banda de 433 MHz
-  if (freqRounded >= 410 && freqRounded <= 441) {
-    CHAN = freqRounded - 410;
-  }
-  // Banda de 900 MHz
-  else if (freqRounded >= 862 && freqRounded <= 930) {
-    CHAN = freqRounded - 862;
-  } else {
-    Serial.print("Frequência inválida: ");
-    Serial.println(freqMHz);
-    Serial.println("Use 410-441 MHz (433) ou 862-930 MHz (900)");
-    return;
-  }
-
-  // Entra no modo de configuração
-  digitalWrite(pinM0, HIGH);
-  digitalWrite(pinM1, HIGH);
-  delay(50);
-
-  LoRa.write(HEAD);
-  LoRa.write(ADDH);
-  LoRa.write(ADDL);
-  LoRa.write(SPEED);
-  LoRa.write(CHAN);  // Frequência arredondada
-  LoRa.write(OPTION_0);
-  LoRa.write(OPTION_1);
-
-  LoRa.flush();
-  delay(50);
-
-  // Retorna ao modo de operação normal
-  digitalWrite(pinM0, LOW);
-  digitalWrite(pinM1, LOW);
-  delay(50);
-
-  Serial.print("LoRa configurado para ");
-  Serial.print((CHAN <= 31) ? (410 + CHAN) : (862 + CHAN));
-  Serial.println(" MHz");
-}
-
-#endif  // LORA
 
 #if BUZZER
 void beep(int dur, int pause, bool toneMode) {
@@ -734,8 +858,12 @@ void beepStatusSequence(bool* status, int tamanho, bool Tone) {
 void setup() {
   Serial.begin(115200);
 
+#if SERIAL_PRINT
+  delay(500); 
+#endif
+
 #if (LORA)
-#if defined(ARDUINO_ARCH_ESP32)
+#if defined(PLACA_ESSENTIALS_V1) || defined(PLACA_MAIN_PTH) || defined(PLACA_MAIN_SMD) || defined(PLACA_MAIN_IC)
   LoRa.begin(LORA_BAUD, SERIAL_8N1, LORA_TX, LORA_RX);
 #else
   LoRa.begin(LORA_BAUD);
@@ -752,8 +880,8 @@ void setup() {
 
 
 #if (GPS_ON)
-#if defined(ARDUINO_ARCH_ESP32)
-  GPS.begin(GPS_BAUD, SERIAL_8N1, GPS_RX, GPS_TX);
+#if defined(PLACA_ESSENTIALS_V1) || defined(PLACA_MAIN_PTH) || defined(PLACA_MAIN_SMD) || defined(PLACA_MAIN_IC)
+  GPS.begin(GPS_BAUD, SERIAL_8N1, GPS_TX, GPS_RX);
 #else
   GPS.begin(GPS_BAUD);
 #endif
@@ -761,18 +889,22 @@ void setup() {
 
 
 #if ((GYRO) || (MAG) || (ACCEL) || (BMP180) || (USE_BMP280))
-#if defined(ARDUINO_ARCH_ESP32)
+#if defined(PLACA_ESSENTIALS_V1) || defined(PLACA_MAIN_PTH) || defined(PLACA_MAIN_SMD) || defined(PLACA_MAIN_IC)
   Wire.begin(SDA_PIN, SCL_PIN);
 #else
   Wire.begin();
 #endif
 #endif
 
+delay(100); // Delay para envio de dados
+
 #if CAM
   pinMode(CAM_PIN, OUTPUT);
 #endif  // CAM
 
 #if BUZZER
+  pinMode(BUZZ_PIN, OUTPUT);
+  digitalWrite(BUZZ_PIN, !BUZZ_ON); 
   bool contadorBuzz[N_SISTEMAS];
   int indexSistemaBuzz = 0;
 #endif
@@ -915,8 +1047,12 @@ void setup() {
 
 #if defined(CONFIG_IDF_TARGET_ESP32S3)
   SPI_SD.begin(SD_SCK, SD_MISO, SD_MOSI, SD_CS);  // inicia os pinos
-
   if (!SD.begin(SD_CS, SPI_SD, 40000000)) {
+
+#elif defined(ARDUINO_ARCH_ESP32)
+  SPI.begin(SD_SCK, SD_MISO, SD_MOSI, SD_CS);  // inicia os pinos
+  if (!SD.begin(SD_CS, SPI)) {
+
 #else
   if (!SD.begin(SD_CS)) {
 #endif
@@ -938,41 +1074,58 @@ void setup() {
 
   // Lógica para nome do arquivo SD
   int iSD = 0;
+  unsigned long t_atual = millis();
+  String baseName = NOME_ARQUIVO;
   while (true) {
-    sprintf(nomeSD, "%s%04d.txt", nomeBaseSD, iSD);
-    // criarNomeArquivoSD(iSD);
-    // Serial.print("Verificando: ");
-    // Serial.println(nomeSD);
+    if (millis() - t_atual > 10000) {
+      strcpy(nomeSD, " err");
+      break;
+    }
+
+    // calcula quantos zeros precisa
+    int numZeros = 8 - baseName.length() - String(iSD).length();
+    String zeros = "";
+    for (int i = 0; i < numZeros-1; i++) zeros += "0";
+
+    // monta o nome do arquivo
+    String nome = "/" + baseName + zeros + String(iSD) + ".txt";
+    nome.toCharArray(nomeSD, sizeof(nomeSD));
+    // Serial.println(String(nomeSD) + " testando.");
 
     if (SD.exists(nomeSD)) {
-      // Serial.print(nomeSD);
-      // Serial.println(" já existe.");
+      // já existe → tenta próximo
+      
     } else {
-      Serial.println(nomeSD);
+      File dataFile = SD.open(nomeSD, FILE_APPEND);
+      if (dataFile) {
+        Serial.println(String(nomeSD) + " criado.");
+      } else {
+        Serial.println(String(nomeSD) + " err");
+      }
       break;
     }
     iSD++;
   }
 #endif
 
-#if (P1)
-  p1.begin();
+#if (PQD_DN)
+  pqd_dn.begin();
 #endif
 
-#if (P2)
-  p2.begin();
+#if (PQD_DB)
+  pqd_db.begin();
 #endif
 
-#if (P3)
-  p3.begin();
+#if (PQD_MN)
+  pqd_mn.begin();
 #endif
 
-#if (P4)
-  p4.begin();
+#if (PQD_MB)
+  pqd_mb.begin();
 #endif
 
 #if (REINICIO)
-#if defined(ARDUINO_ARCH_ESP32)
+#if defined(PLACA_ESSENTIALS_V1) || defined(PLACA_MAIN_PTH) || defined(PLACA_MAIN_SMD) || defined(PLACA_MAIN_IC)
   prefs.begin("config", false);                 // abre namespace NVS
   vooAtivo = prefs.getBool("vooAtivo", false);  // recupera estado salvo
 #endif                                          // ARCH ESP32
@@ -1004,17 +1157,41 @@ void setup() {
   pressaoInicial = soma / contagem;
   altitudeInicial = 44330.77 * (1.0 - pow(pressaoInicial / 101325.0, 0.19026));
 
-  Serial.print(F("Baro starts: "));
-  Serial.println(pressaoInicial);
+#if (REINICIO)
+  bool valorOk = true;
+  if ((pressaoInicial >= 100000 || pressaoInicial <= 85000)) {
+    valorOk = false;
+  }
+  if (!valorOk && vooAtivo) {
+#if defined(PLACA_ESSENTIALS_V1) || defined(PLACA_MAIN_PTH) || defined(PLACA_MAIN_SMD) || defined(PLACA_MAIN_IC)
+    pressaoInicial = prefs.getFloat("pressaoIni", 0);  // testar
+    altitudeInicial = getHeight(pressaoInicial);
+    sim.restart(pressaoInicial, altitudeInicial);
+#endif  // ARCH ESP32
+    Serial.println(F("RESTART PROTECTION"));
+  } else {
+    vooAtivo = false;
+#if defined(PLACA_ESSENTIALS_V1) || defined(PLACA_MAIN_PTH) || defined(PLACA_MAIN_SMD) || defined(PLACA_MAIN_IC)
+    prefs.putFloat("pressaoIni", pressaoInicial);
+    prefs.putBool("vooAtivo", vooAtivo);
+#endif  // ARCH ESP32
+    Serial.println(F("NO RESTART PROTECTION"));
+  }
+#endif  // REINICIO
 
 #if SD_CARD
-  dataFile = SD.open(nomeSD, FILE_WRITE);
+  dataFile = SD.open(nomeSD, FILE_APPEND);
   if (dataFile) {
-    // Cabeçalho
     dataFile.print(F("Baro starts: "));
     dataFile.println(pressaoInicial);
+    dataFile.flush();
+    dataFile.close();
   }
 #endif
+#endif
+
+#if (ENABLE_3D)
+  filter.begin(FREQ_3D);  // taxa de amostragem em Hz
 #endif
 
 #if (SIMULADOR)
@@ -1050,7 +1227,7 @@ void setup() {
     valorOk = false;
   }
   if (!valorOk && vooAtivo) {
-#if defined(ARDUINO_ARCH_ESP32)
+#if defined(PLACA_ESSENTIALS_V1) || defined(PLACA_MAIN_PTH) || defined(PLACA_MAIN_SMD) || defined(PLACA_MAIN_IC)
     pressaoInicial = prefs.getFloat("pressaoIni", 0);  // testar
     altitudeInicial = getHeight(pressaoInicial);
     sim.restart(pressaoInicial, altitudeInicial);
@@ -1058,7 +1235,7 @@ void setup() {
     Serial.println(F("RESTART PROTECTION"));
   } else {
     vooAtivo = false;
-#if defined(ARDUINO_ARCH_ESP32)
+#if defined(PLACA_ESSENTIALS_V1) || defined(PLACA_MAIN_PTH) || defined(PLACA_MAIN_SMD) || defined(PLACA_MAIN_IC)
     prefs.putFloat("pressaoIni", pressaoInicial);
     prefs.putBool("vooAtivo", vooAtivo);
 #endif  // ARCH ESP32
@@ -1102,6 +1279,29 @@ void setup() {
 
   header += "tempo_s\t";
 
+#if (ACCEL)
+  header += "accX_g\t";
+  header += "accY_g\t";
+  header += "accZ_g\t";
+#endif
+
+#if (GYRO)
+  header += "gyroX_dps\t";
+  header += "gyroY_dps\t";
+  header += "gyroZ_dps\t";
+#endif
+
+#if (MAG)
+  header += "magX_uT\t";
+  header += "magY_uT\t";
+  header += "magZ_uT\t";
+#endif
+
+#if (USE_DHT)
+  header += "tdht_C\t";
+  header += "umidade_%\t";
+#endif
+
 #if (USE_BMP280)
   header += "temp_C\t";
   header += "pressao_Pa\t";
@@ -1122,75 +1322,18 @@ void setup() {
   header += "transonic\t";
 #endif
 
-#if (APOGEU)
-  header += "descendo\t";
-  header += "altApogee_m\t";
-  header += "tApogee_s\t";
-  header += "altMax_m\t";
-#endif
-
-#if (USE_DHT)
-  header += "tdht_C\t";
-  header += "umidade_%\t";
-#endif
-
-#if (ACCEL)
-  header += "accX_g\t";
-  header += "accY_g\t";
-  header += "accZ_g\t";
-#endif
-
-#if (GYRO)
-  header += "gyroX_dps\t";
-  header += "gyroY_dps\t";
-  header += "gyroZ_dps\t";
-#endif
-
-#if (MAG)
-  header += "magX_uT\t";
-  header += "magY_uT\t";
-  header += "magZ_uT\t";
-#endif
-
-#if (PARAQUEDAS && P1)
-  header += "p1_data\t";
-#if (SAUDE)
-  header += "p1_info\t";
-#endif
-#endif
-
-#if (PARAQUEDAS && P2)
-  header += "p2_data\t";
-#if (SAUDE)
-  header += "p2_info\t";
-#endif
-#endif
-
-#if (PARAQUEDAS && P3)
-  header += "p3_data\t";
-#if (SAUDE)
-  header += "p3_info\t";
-#endif
-#endif
-
-#if (PARAQUEDAS && P4)
-  header += "p4_data\t";
-#if (SAUDE)
-  header += "p4_info\t";
-#endif
-#endif
-
-
 #if (GPS_ON)
-  header += "lat_deg\t";
-  header += "lon_deg\t";
-  header += "alt_gps_m\t";
-  header += "vel_kmph";
+  header += "lat.GPS.deg\t";
+  header += "lon.GPS.deg\t";
+  header += "alt.GPS.m\t";
+  header += "vel.GPS.kmph\t";
+  header += "hora.GPS\t";
+  header += "min.GPS\t";
+  header += "precisao.GPS\t";
 #endif
-  header += "\n";
 
 #if (SD_CARD)
-  dataFile = SD.open(nomeSD, FILE_WRITE);
+  dataFile = SD.open(nomeSD, FILE_APPEND);
   if (dataFile) {
     dataFile.println(header);
     dataFile.flush();
@@ -1201,35 +1344,91 @@ void setup() {
   }
 #endif
 
+#if (APOGEU)
+  header += "descendo\t";
+  header += "altApogee_m\t";
+  header += "tApogee_s\t";
+  header += "altMax_m\t";
+#endif
+
+
+#if (PARAQUEDAS && PQD_DN)
+  header += "p1_data\t";
+#if (SAUDE)
+  header += "p1_info\t";
+#endif
+#endif
+
+#if (PARAQUEDAS && PQD_DB)
+  header += "p2_data\t";
+#if (SAUDE)
+  header += "p2_info\t";
+#endif
+#endif
+
+#if (PARAQUEDAS && PQD_MN)
+  header += "p3_data\t";
+#if (SAUDE)
+  header += "p3_info\t";
+#endif
+#endif
+
+#if (PARAQUEDAS && PQD_MB)
+  header += "p4_data\t";
+#if (SAUDE)
+  header += "p4_info\t";
+#endif
+#endif
+
+  // header += "\n";
+
   Serial.println(header);
 
 
 #if (LORA)
-  String sendHeader = "time_s";
+  String sendHeader = "linha\t";
+  sendHeader += "tempo.s\t";
 
 #if (GPS_ON)
-  sendHeader += "\tlat_deg\tlon_deg";
+  sendHeader += "lat.GPS.deg\tlon.GPS.deg\t";
+  sendHeader += "hora.GPS\tmin.GPS\tprecisao.GPS\t";
 #endif  // GPS_ON
 
-#if (APOGEU)
-  sendHeader += "\taltMax_m";
-#endif  // APOGEU
-
 #if (USE_BMP280)
-  sendHeader += "\taltAtual_m";
+  sendHeader += "baro.h.m\t";
 #endif  // USE_BMP280
 
-#if (P1)
-  sendHeader += "\tp1_height\tp1_time";
+#if (SD_CARD)
+  sendHeader += "sd.bool\t";
 #endif
-#if (P2)
-  sendHeader += "\tp2_height\tp2_time";
+
+#if (APOGEU)
+  sendHeader += "apogeu.h.m\t";
+  sendHeader += "apogeu.t.s\t";
+#endif  // APOGEU
+
+#if (PQD_MN)
+  sendHeader += "pqd_mn.h.m\tpqd_mn.t.s\t";
+  // sendHeader += "pqd_mn.t.s\t";
 #endif
-#if (P3)
-  sendHeader += "\tp3_height\tp3_time";
+
+#if (PQD_DN)
+  sendHeader += "pqd_dn.h.m\t";
+  // sendHeader += "pqd_dn.t.s\t";
 #endif
-#if (P4)
-  sendHeader += "\tp4_height\tp4_time";
+
+#if (PQD_MB)
+  sendHeader += "pqd_mb.h.m\t";
+  // sendHeader += "pqd_mb.t.s\t";
+#endif
+
+#if (PQD_DB)
+  sendHeader += "pqd_db.h.m\t";
+  // sendHeader += "pqd_db.t.s\t";
+#endif
+
+#if (USE_BMP280)
+  sendHeader += "baro.t.c";
 #endif
 
   LoRa.println(sendHeader);
@@ -1269,15 +1468,15 @@ void setup() {
 #endif  // CAM
 #endif  // WUF
 #if (TRANSONICO)
-transStart = currentTime;
-while (currentTime - transStart < TIMER_TRANS) {
+  transStart = currentTime;
+  while (currentTime - transStart < TIMER_TRANS) {
     currentTime = millis();
-  readAll();
+    readAll();
 #if (BUZZER)
     BeepSistemas.beep(currentTime);
 #endif
-}
-transonico = false;
+  }
+  transonico = false;
 #endif
 }
 

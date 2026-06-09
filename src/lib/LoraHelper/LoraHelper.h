@@ -1,11 +1,8 @@
-#ifndef URD_LORA_H
-#define URD_LORA_H
+#ifndef LORA_HELPER_H
+#define LORA_HELPER_H
 
 
-
-#if defined(FREQUENCY_900) + defined(FREQUENCY_868) + defined(FREQUENCY_433) > 1
-  #error "⚠️ Apenas uma frequência deve ser definida! Use #define FREQUENCY_900 ou 868 ou 433 antes do include."
-#elif defined(FREQUENCY_900)
+#if defined(FREQUENCY_900)
   #define URD_LORA_MODULE "E32-900"
   #define URD_LORA_BASE_FREQ 862.0
   #define URD_LORA_MAX_CHANNEL 69
@@ -18,13 +15,16 @@
   #define URD_LORA_BASE_FREQ 410.0
   #define URD_LORA_MAX_CHANNEL 31
 #else
-  #error "⚠️ Defina a frequência do módulo antes de incluir: #define FREQUENCY_900 (ou 868/433)"
+#define FREQUENCY_900
+  #define URD_LORA_MODULE "E32-900"
+  #define URD_LORA_BASE_FREQ 862.0
+  #define URD_LORA_MAX_CHANNEL 69
 #endif
 
 #include "Arduino.h"
 #include "LoRa_E32.h"
 
-class URD_LoRa {
+class Lora_Helper {
   private:
     LoRa_E32* _lora;
     HardwareSerial* _serial;
@@ -36,11 +36,11 @@ class URD_LoRa {
 
   public:
     #ifdef ARDUINO_ARCH_ESP32
-      URD_LoRa(HardwareSerial* serial, int txPin, int rxPin,
+      Lora_Helper(HardwareSerial* serial, int txPin, int rxPin,
                uint8_t pinM0, uint8_t pinM1, uint8_t pinAUX,
                float freqMHz);
     #else
-      URD_LoRa(HardwareSerial* serial,
+      Lora_Helper(HardwareSerial* serial,
                uint8_t pinM0, uint8_t pinM1, uint8_t pinAUX,
                float freqMHz);
     #endif
@@ -49,8 +49,8 @@ class URD_LoRa {
     void setFrequency(uint8_t freqMHz);
     void setAddress(uint8_t addH, uint8_t addL);
     void applyConfig();
-    void send(const String& msg);
-    void sendln(const String& msg);
+    void print(const String& msg);
+    void println(const String& msg);
 
 };
 

@@ -1,7 +1,7 @@
-#include "URD_LoRa.h"
+#include "LoraHelper.h"
 
 #ifdef ARDUINO_ARCH_ESP32
-URD_LoRa::URD_LoRa(HardwareSerial* serial, int txPin, int rxPin,
+Lora_Helper::Lora_Helper(HardwareSerial* serial, int txPin, int rxPin,
                    uint8_t pinM0, uint8_t pinM1, uint8_t pinAUX,
                    float freqMHz) {
   _serial = serial;
@@ -13,7 +13,7 @@ URD_LoRa::URD_LoRa(HardwareSerial* serial, int txPin, int rxPin,
   _lora = new LoRa_E32(_serial, pinM0, pinM1, pinAUX);
 }
 #else
-URD_LoRa::URD_LoRa(HardwareSerial* serial,
+Lora_Helper::Lora_Helper(HardwareSerial* serial,
                    uint8_t pinM0, uint8_t pinM1, uint8_t pinAUX,
                    float freqMHz) {
   _serial = serial;
@@ -26,12 +26,12 @@ URD_LoRa::URD_LoRa(HardwareSerial* serial,
 #endif
 
 
-void URD_LoRa::begin() {
+void Lora_Helper::begin() {
   _lora->begin();
 }
 
 
-void URD_LoRa::setFrequency(uint8_t freqMHz) {
+void Lora_Helper::setFrequency(uint8_t freqMHz) {
   if ((freqMHz > URD_LORA_BASE_FREQ + URD_LORA_MAX_CHANNEL) || (freqMHz < URD_LORA_BASE_FREQ)) {
     Serial.println(F("Frequencia fora da faixa → Usando 0x37 (canal 55)"));
     _channel = 0x37;
@@ -40,12 +40,12 @@ void URD_LoRa::setFrequency(uint8_t freqMHz) {
   }
 }
 
-void URD_LoRa::setAddress(uint8_t addH, uint8_t addL) {
+void Lora_Helper::setAddress(uint8_t addH, uint8_t addL) {
   _addH = addH;
   _addL = addL;
 }
 
-void URD_LoRa::applyConfig() {
+void Lora_Helper::applyConfig() {
   ResponseStructContainer c = _lora->getConfiguration();
   Configuration config = *(Configuration*)c.data;
 
@@ -69,10 +69,10 @@ void URD_LoRa::applyConfig() {
 }
 
 
-void URD_LoRa::send(const String& msg) {
+void Lora_Helper::print(const String& msg) {
   _serial->print(msg);
 }
 
-void URD_LoRa::sendln(const String& msg) {
+void Lora_Helper::println(const String& msg) {
   _serial->println(msg);
 }
