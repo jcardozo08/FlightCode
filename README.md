@@ -1,6 +1,6 @@
 # FlightCode
 
-Firmware de voo **modular** para os computadores de bordo da equipe UFABC Rocket Design. Um único código-fonte compila para várias placas diferentes: a placa e os sensores são escolhidos em tempo de compilação, então a mesma lógica de voo validada roda em todo o hardware da equipe.
+Firmware de voo **modular** para computadores de bordo de foguetes. Um único código-fonte compila para várias placas diferentes: a placa e os sensores são escolhidos em tempo de compilação, então a mesma lógica de voo validada roda em todas as minhas placas.
 
 ## Placas suportadas
 
