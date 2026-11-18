@@ -6,9 +6,9 @@
 
 // #define PLACA_MAIN_OCTA_PTH
 // #define PLACA_ESSENTIALS_V1
-// #define PLACA_MAIN_PTH
+#define PLACA_MAIN_PTH
 // #define PLACA_MAIN_SMD
-#define PLACA_MAIN_IC
+// #define PLACA_MAIN_IC
 
 //------------------------------ SENSORES PRINCIPAIS ------------------------------//
 #define SENSORES 1  // Ativa sensores em geral
@@ -19,13 +19,13 @@
 #define GYRO ((USE_GY91) && 1)      // Giroscópio GY91
 #define MAG ((USE_GY91) && 0)       // Magnetômetro GY91
 
-#define USE_GY912 ((SENSORES) && 1)  // Módulo GY-912 (icm20948, bmp280)
+#define USE_GY912 ((SENSORES) && 0)  // Módulo GY-912 (icm20948, bmp280)
 #define USE_BMP380 ((USE_GY912) && 0)  // Barômetro BMP380 (com o modulo GY912)
 #define ACCEL_ICM ((USE_GY912) && 0)     // Acelerômetro GY912
 #define GYRO_ICM ((USE_GY912) && 0)      // Giroscópio GY912
 #define MAG_ICM ((USE_GY912) && 0)       // Magnetômetro GY912
 
-#define USE_BME280 (defined(PLACA_MAIN_IC) && 1)  // Barômetro BME280 
+#define USE_BME280 (defined(PLACA_MAIN_IC) && 0)  // Barômetro BME280 
 
 #define USE_DHT ((SENSORES) && 0)   // Sensor de temperatura e umidade (DHT)
 
@@ -50,7 +50,7 @@
 #define PQD_MB (PARAQUEDAS && 1)
 
 //------------------------------ ARMAZENAMENTO ------------------------------//
-#define SD_CARD 0           // Habilita módulo de cartão SD
+#define SD_CARD 1           // Habilita módulo de cartão SD
 #define NOME_ARQUIVO "SAT"  // Prefixo do nome do arquivo de log
 
 //------------------------------ MODULOS ------------------------------//

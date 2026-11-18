@@ -260,7 +260,7 @@
   // ------------------------------ BUZZER ------------------------------//
   #if (BUZZER)
     #define BUZZ_PIN 42
-    #define BUZZ_TONE 0
+    #define BUZZ_TONE 1
     #define BUZZ_ON LOW
   #endif
 
